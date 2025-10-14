@@ -5,6 +5,9 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
 
 data class UiState(
     val titulo: String = "",
@@ -31,13 +34,20 @@ class MainViewModel : ViewModel() {
     fun setFecha(v: String) = _ui.tryEmit(_ui.value.copy(fechaVencimiento = v))
     fun setCompletada(v: Boolean) = _ui.tryEmit(_ui.value.copy(completada = v))
 
+    private fun friendlyError(e: Throwable) = when (e) {
+        is UnknownHostException -> "No se pudo conectar al servidor. Revisa tu internet o la URL."
+        is SocketTimeoutException -> "El servidor tardó en responder. Intenta de nuevo."
+        is ConnectException -> "No hay conexión con el servidor."
+        else -> "Ocurrió un error inesperado."
+    }
+
     fun cargar() = viewModelScope.launch {
         try {
             _ui.emit(_ui.value.copy(cargando = true, error = null))
             val data = api.getPrioridades()
             _ui.emit(_ui.value.copy(lista = data, cargando = false))
         } catch (e: Exception) {
-            _ui.emit(_ui.value.copy(error = e.message, cargando = false))
+            _ui.emit(_ui.value.copy(error = friendlyError(e), cargando = false))
         }
     }
 
@@ -61,10 +71,10 @@ class MainViewModel : ViewModel() {
             _ui.emit(s.copy(
                 titulo = "", descripcion = "", nivel = 2,
                 fechaVencimiento = "", completada = false,
-                lista = data, cargando = false
+                lista = data, cargando = false, error = null
             ))
         } catch (e: Exception) {
-            _ui.emit(s.copy(error = e.message, cargando = false))
+            _ui.emit(s.copy(error = friendlyError(e), cargando = false))
         }
     }
 }
